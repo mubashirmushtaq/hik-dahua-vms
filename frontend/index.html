@@ -21,7 +21,17 @@ video{width:100%;background:#000;border-radius:8px;margin-top:8px}
   <p><small>Installer = admin. Camera passwords are never shown here.</small></p>
 </div>
 <div id="app" class="hidden">
-  <div class="card"><h3>Add camera</h3>
+  <div class="card"><h3>Hik-Connect cloud — official account</h3>
+    <p><small>Log in with your Hik-Connect account (same as the mobile app) and every linked NVR / camera shows up below — no IP, no port forwarding. Your Hik password is kept in memory only, never saved.</small></p>
+    <input id="hiku" placeholder="Hik-Connect email">
+    <input id="hikp" type="password" placeholder="Hik-Connect password">
+    <button onclick="hikLogin()">Login to Hik-Connect</button>
+    <button onclick="hikLogout()" style="width:auto;background:#374151">Logout</button>
+    <p id="hikStatus"><small>Not logged in to Hik-Connect.</small></p>
+    <div id="hikList"></div>
+    <p><small>If a camera is encrypted, its live view needs the device verification code (on the device label) — enter it when you press Watch. First frame takes ~5–15s. Default is SD substream; tick HD for main stream.</small></p>
+  </div>
+  <div class="card"><h3>Add camera (LAN / RTSP)</h3>
     <input id="name" placeholder="Name — e.g. Front Gate">
     <select id="brand"><option value="hikvision">Hikvision</option><option value="dahua">Dahua</option></select>
     <input id="host" placeholder="NVR / camera IP or host — e.g. 192.168.1.64">
@@ -35,6 +45,7 @@ video{width:100%;background:#000;border-radius:8px;margin-top:8px}
   </div>
   <div class="grid" id="grid"></div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7"></script>
 <script>
 let token='';
 async function login(){
@@ -42,7 +53,7 @@ async function login(){
     body:JSON.stringify({username:u.value,password:p.value})});
   if(!r.ok){alert('Wrong username or password');return}
   const d=await r.json(); token=d.token;
-  loginCard.classList.add('hidden'); app.classList.remove('hidden'); load();
+  loginCard.classList.add('hidden'); app.classList.remove('hidden'); load(); hikStatusInit();
 }
 async function load(){
   const r=await fetch('/api/cameras',{headers:{Authorization:'Bearer '+token}});
@@ -60,4 +71,62 @@ async function addCam(){
 }
 async function delCam(id){ if(!confirm('Delete camera?'))return;
   await fetch('/api/cameras/'+id,{method:'DELETE',headers:{Authorization:'Bearer '+token}}); load(); }
+async function hikLogin(){
+  const r=await fetch('/api/hikconnect/login',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({username:hiku.value,password:hikp.value})});
+  const d=await r.json();
+  if(!r.ok){alert(d.detail||'Hik-Connect login failed');return}
+  hikStatus.innerHTML=`<small>Logged in as <b>${d.account}</b> — ${d.cameras} cameras/channels linked.</small>`;
+  hikListCams();
+}
+async function hikLogout(){
+  await fetch('/api/hikconnect/logout',{method:'POST',headers:{Authorization:'Bearer '+token}});
+  hikStatus.innerHTML='<small>Not logged in to Hik-Connect.</small>'; hikList.innerHTML='';
+}
+async function hikListCams(){
+  const r=await fetch('/api/hikconnect/cameras',{headers:{Authorization:'Bearer '+token}});
+  const cams=await r.json();
+  if(!Array.isArray(cams)){hikList.innerHTML='<p>'+(cams.detail||'Could not list devices')+'</p>';return}
+  const byDevice={}; cams.forEach(c=>{(byDevice[c.device]=byDevice[c.device]||[]).push(c)});
+  hikList.innerHTML=Object.entries(byDevice).map(([dev,list])=>`<div style="margin:10px 0"><b>${dev}</b> <small>(${list.length} channels)</small>`+
+    list.map(c=>`<div class="tile" style="margin-top:6px"><b>${c.name}</b> <small>ch${c.channelNo} · ${c.deviceSerial}</small>
+    <br><img id="snap${c.index}" style="width:100%;max-width:320px;display:none">
+    <br><input id="vc${c.index}" placeholder="Verification code (only if encrypted)" style="width:60%">
+    <label style="font-size:13px"><input id="hd${c.index}" type="checkbox" style="width:auto"> HD</label>
+    <button onclick="hikSnap(${c.index})" style="width:auto">Snapshot</button>
+    <button onclick="hikWatch(${c.index})" style="width:auto">Watch live</button>
+    <button onclick="hikStop(${c.index})" style="width:auto;background:#991b1b">Stop</button>
+    <div id="watch${c.index}"></div></div>`).join('')+'</div>').join('')
+    || '<p>No cameras on this Hik-Connect account.</p>';
+}
+async function hikSnap(i){
+  const r=await fetch(`/api/hikconnect/cameras/${i}/snapshot?validate_code=${encodeURIComponent(document.getElementById('vc'+i).value||'')}`,{headers:{Authorization:'Bearer '+token}});
+  if(!r.ok){alert(await r.text());return}
+  const img=document.getElementById('snap'+i); img.src=URL.createObjectURL(await r.blob()); img.style.display='block';
+}
+async function hikWatch(i){
+  const vc=document.getElementById('vc'+i).value||null;
+  const main=document.getElementById('hd'+i).checked;
+  const box=document.getElementById('watch'+i);
+  box.innerHTML='<small>Starting cloud stream… first frame takes ~5–15s.</small>';
+  const r=await fetch(`/api/hikconnect/cameras/${i}/watch`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({validate_code:vc,main})});
+  const d=await r.json();
+  if(!r.ok){box.innerHTML='<small>'+(d.detail||'Could not start stream')+'</small>';return}
+  box.innerHTML=`<video id="vid${i}" controls autoplay muted playsinline></video>
+    <br><small>HLS: <a href="${d.hls}" target="_blank">${d.hls}</a> · <a href="${d.viewer}" target="_blank">viewer</a> (port ${d.port})</small>`;
+  const v=document.getElementById('vid'+i);
+  if(window.Hls && Hls.isSupported()){const h=new Hls(); h.loadSource(d.hls); h.attachMedia(v); h.on(Hls.Events.MANIFEST_PARSED,()=>v.play().catch(()=>{}));}
+  else if(v.canPlayType('application/vnd.apple.mpegurl')){v.src=d.hls; v.play().catch(()=>{});}
+  else {box.innerHTML+='<br><small>Your browser cannot play HLS — open the viewer link instead.</small>';}
+}
+async function hikStop(i){
+  await fetch(`/api/hikconnect/cameras/${i}/watch`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
+  document.getElementById('watch'+i).innerHTML='';
+}
+async function hikStatusInit(){
+  const r=await fetch('/api/hikconnect/status',{headers:{Authorization:'Bearer '+token}});
+  const d=await r.json();
+  if(d.logged_in){hikStatus.innerHTML=`<small>Logged in as <b>${d.account}</b> — ${d.cameras} cameras/channels linked.</small>`; hikListCams();}
+}
 </script></body></html>

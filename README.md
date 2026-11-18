@@ -4,6 +4,19 @@ Owner: Mubashir Mushtaq. Built from scratch, no vendor VMS.
 One web dashboard, login with your own VMS account, add cameras
 by brand + account login, watch them live in the browser.
 
+## Two ways to add cameras
+
+**1. LAN / device login (v1)** — the admin account on the NVR/camera
+itself, over RTSP. Works anywhere the VMS can reach the camera.
+
+**2. Hik-Connect cloud login (v2, Hik only)** — log in with your
+official Hik-Connect account (same as the mobile app) in the VMS,
+and every linked NVR/camera shows up — each NVR channel as its own
+camera. No IP, no port forwarding. Live video via Hik's cloud VTM
+relay (HLS). Your Hik password stays in server memory only, never
+on disk. See `API.md` §8. Dahua cloud (DMSS) has no stable public
+library, so Dahua stays LAN-only for now.
+
 ## How it works
 
 ```

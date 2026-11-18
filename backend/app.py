@@ -15,9 +15,12 @@ import urllib.parse
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
+import hikcloud
+from hikcloud import CloudError
 
 BASE = Path(__file__).resolve().parent.parent
 DATA = BASE / "data"
@@ -231,7 +234,7 @@ def list_streams(req: Request):
 def add_camera(body: CameraIn, req: Request):
     require_auth(req)
     if body.conn == "cloud":
-        raise HTTPException(400, "cloud login is Phase 3 (Hik first) — use device login for now")
+        raise HTTPException(400, "cloud cameras come from the Hik-Connect login above — log in there, then Watch live")
     # Validate the RTSP URL builds (no network call here — camera may be remote)
     rtsp_url(body.brand, body.host, body.port, body.channel,
              body.username, body.password)
@@ -258,6 +261,97 @@ def delete_camera(cid: int, req: Request):
     con.close()
     write_go2rtc_config()
     return {"deleted": cid}
+
+
+class HikLogin(BaseModel):
+    username: str  # Hik-Connect account — same email as the mobile app
+    password: str
+
+
+class HikWatch(BaseModel):
+    validate_code: str | None = None  # device verification code, if encrypted
+    main: bool = False  # True = HD main stream, False = SD substream
+
+
+def _cloud_base(req: Request, port: int) -> str:
+    """Public base for a per-camera cloud proxy (same host, its own port)."""
+    host = (req.headers.get("host") or "localhost:8000").split(":")[0]
+    scheme = "https" if req.headers.get("x-forwarded-proto") == "https" else "http"
+    return f"{scheme}://{host}:{port}"
+
+
+@app.get("/api/hikconnect/status")
+def hik_status(req: Request):
+    require_auth(req)
+    return hikcloud.status()
+
+
+@app.post("/api/hikconnect/login")
+def hik_login(body: HikLogin, req: Request):
+    """Log in to the official Hik-Connect account. Returns every linked
+    device/channel. The Hik password is kept in memory only — never on
+    disk, never in git, never returned by any endpoint."""
+    require_auth(req)
+    try:
+        return hikcloud.login(body.username, body.password)
+    except CloudError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/hikconnect/logout")
+def hik_logout(req: Request):
+    require_auth(req)
+    hikcloud.logout()
+    return {"logged_in": False}
+
+
+@app.get("/api/hikconnect/cameras")
+def hik_cameras(req: Request, refresh: bool = False):
+    """All cameras/channels on the logged-in Hik-Connect account,
+    grouped by device (NVR) on the frontend."""
+    require_auth(req)
+    try:
+        return hikcloud.list_cameras(refresh=refresh)
+    except CloudError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.get("/api/hikconnect/cameras/{index}/snapshot")
+def hik_snapshot(index: int, req: Request, validate_code: str | None = None):
+    require_auth(req)
+    try:
+        return Response(content=hikcloud.snapshot(index, validate_code),
+                        media_type="image/jpeg")
+    except CloudError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/hikconnect/cameras/{index}/watch")
+def hik_watch(index: int, body: HikWatch, req: Request):
+    """Start live video for one cloud camera. Returns the HLS viewer +
+    stream URLs. First frame takes ~5-15s (cloud VTM handshake)."""
+    require_auth(req)
+    try:
+        info = hikcloud.start_watch(index, body.validate_code, body.main)
+    except CloudError as exc:
+        raise HTTPException(400, str(exc))
+    base = _cloud_base(req, info["port"])
+    return {k: v for k, v in info.items() if k not in ("process", "pid")} | {
+        "viewer": f"{base}/", "hls": f"{base}/hls/index.m3u8",
+        "mjpeg": f"{base}/mjpeg",
+        "ts": f"{base}/{info['deviceSerial']}-{info['channelNo']}.ts"}
+
+
+@app.get("/api/hikconnect/watch")
+def hik_watches(req: Request):
+    require_auth(req)
+    return hikcloud.list_watches()
+
+
+@app.delete("/api/hikconnect/cameras/{index}/watch")
+def hik_stop_watch(index: int, req: Request):
+    require_auth(req)
+    return {"stopped": hikcloud.stop_watch(index)}
 
 
 @app.get("/api/go2rtc")

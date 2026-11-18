@@ -106,6 +106,57 @@ Note: go2rtc must be running (`docker compose up -d`) and reachable
 on port 1984 from wherever the player is. If the VMS is remote,
 set `GO2RTC_PUBLIC_URL=https://<your-domain>:1984` in `.env`.
 
+## 8. Hik-Connect cloud — log in with the official account
+
+This is the cloud path: log in with the Hik-Connect account (same
+email/password as the mobile app) and every linked device shows up —
+NVRs included, each channel as its own camera. No IP, no port
+forwarding, no RTSP. Live video comes from Hik's cloud VTM relay.
+
+**Security:** your Hik password is kept in server memory only. It is
+never written to disk, never in git, never returned by any endpoint.
+Restart the VMS and you log in again. A device verification code
+(for encrypted streams) is passed per request and also never stored.
+
+```bash
+# Login — returns the account + how many cameras/channels it has
+curl -s -X POST http://<server>:8000/api/hikconnect/login \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"username":"you@example.com","password":"YOUR-HIK-PASSWORD"}'
+# {"account": "you@example.com", "cameras": 12}
+
+# List every linked camera/channel, grouped by device (NVR) in the UI
+curl -s http://<server>:8000/api/hikconnect/cameras \
+  -H "Authorization: Bearer $TOKEN"
+# [{"index":1,"name":"Cam 1","device":"My NVR","deviceSerial":"ABC123","channelNo":1}, …]
+
+# Cloud snapshot (~352x288 JPEG)
+curl -s http://<server>:8000/api/hikconnect/cameras/1/snapshot \
+  -H "Authorization: Bearer $TOKEN" -o snap.jpg
+
+# Watch live — starts an HLS proxy for that camera (first frame ~5-15s)
+curl -s -X POST http://<server>:8000/api/hikconnect/cameras/1/watch \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"main": false}'
+# {"index":1,"name":"Cam 1","port":8558,"viewer":"http://<server>:8558/",
+#  "hls":"http://<server>:8558/hls/index.m3u8","mjpeg":"…","ts":"…"}
+# main:true = HD main stream where supported; default false = SD substream.
+# If the device is encrypted, add "validate_code": "<device verification code>".
+
+# Stop a live stream / log out of Hik-Connect (stops all cloud streams)
+curl -s -X DELETE http://<server>:8000/api/hikconnect/cameras/1/watch \
+  -H "Authorization: Bearer $TOKEN"
+curl -s -X POST http://<server>:8000/api/hikconnect/logout \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Caveats (this uses the unofficial `hikcloudstream` library,
+reverse-engineered from the Hik-Connect app — not affiliated with
+Hikvision, and Hik can change the API): if Hik asks for a CAPTCHA,
+log in once in the official app to clear it, then retry here.
+Cloud streams are limited by Hik (concurrent-stream cap, ~5-15s to
+first frame). Encrypted devices need their verification code.
+
 ## Python client
 
 See `examples/api_client.py`:
