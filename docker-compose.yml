@@ -1,0 +1,27 @@
+services:
+  vms:
+    build: .
+    container_name: custom-vms
+    environment:
+      - VMS_ADMIN_USER=${VMS_ADMIN_USER:-installer}
+      - VMS_ADMIN_PASS=${VMS_ADMIN_PASS:-change-me-now}
+      - SECRET_KEY=${SECRET_KEY:-change-me-now}
+      - GO2RTC_CONFIG=/data/go2rtc.yaml
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    depends_on:
+      - go2rtc
+
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: custom-vms-go2rtc
+    volumes:
+      - ./data/go2rtc.yaml:/config/go2rtc.yaml:ro
+    ports:
+      - "1984:1984"
+      - "8554:8554"
+      - "8555:8555/udp"
+    restart: unless-stopped

@@ -1,0 +1,63 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Custom VMS — Hik + Dahua</title>
+<style>
+body{font-family:system-ui;background:#0b1220;color:#e5e7eb;margin:0;padding:16px}
+h1{font-size:20px}.card{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:14px;margin:12px 0}
+input,select,button{padding:9px;margin:4px 0;border-radius:8px;border:1px solid #374151;background:#0f172a;color:#e5e7eb;width:100%;box-sizing:border-box}
+button{background:#2563eb;border:none;cursor:pointer;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+.tile{background:#000;border:1px solid #1f2937;border-radius:10px;padding:10px}
+.tile b{font-size:14px}.tile small{color:#9ca3af}
+video{width:100%;background:#000;border-radius:8px;margin-top:8px}
+.hidden{display:none}
+</style></head><body>
+<h1>Custom VMS — Hikvision + Dahua</h1>
+<div class="card" id="loginCard">
+  <h3>VMS login</h3>
+  <input id="u" placeholder="username — installer" value="installer">
+  <input id="p" type="password" placeholder="password">
+  <button onclick="login()">Login</button>
+  <p><small>Installer = admin. Camera passwords are never shown here.</small></p>
+</div>
+<div id="app" class="hidden">
+  <div class="card"><h3>Add camera</h3>
+    <input id="name" placeholder="Name — e.g. Front Gate">
+    <select id="brand"><option value="hikvision">Hikvision</option><option value="dahua">Dahua</option></select>
+    <input id="host" placeholder="NVR / camera IP or host — e.g. 192.168.1.64">
+    <input id="port" type="number" value="554">
+    <input id="channel" type="number" value="1">
+    <input id="cuser" placeholder="Camera account — usually admin" value="admin">
+    <input id="cpass" type="password" placeholder="Camera account password">
+    <button onclick="addCam()">Add camera</button>
+    <p><small>Hik RTSP: /Streaming/Channels/101 &nbsp;·&nbsp; Dahua RTSP: /cam/realmonitor?channel=1&amp;subtype=0<br>
+    Live video plays via go2rtc on :1984 — restart go2rtc after adding a camera, then open its stream below.</small></p>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+<script>
+let token='';
+async function login(){
+  const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:u.value,password:p.value})});
+  if(!r.ok){alert('Wrong username or password');return}
+  const d=await r.json(); token=d.token;
+  loginCard.classList.add('hidden'); app.classList.remove('hidden'); load();
+}
+async function load(){
+  const r=await fetch('/api/cameras',{headers:{Authorization:'Bearer '+token}});
+  const cams=await r.json();
+  grid.innerHTML=cams.map(c=>`<div class="tile"><b>${c.name}</b> <small>${c.brand} · ${c.host}:${c.port} · ch${c.channel}</small>
+    <br><small>go2rtc stream: <b>cam${c.id}</b> — open http://&lt;server&gt;:1984, or embed WebRTC here in Phase 1b</small>
+    <br><button onclick="delCam(${c.id})" style="width:auto;background:#991b1b">Delete</button></div>`).join('')
+    || '<p>No cameras yet — add your first one above.</p>';
+}
+async function addCam(){
+  const body={name:name.value,brand:brand.value,host:host.value,port:+port.value,channel:+channel.value,username:cuser.value,password:cpass.value,conn:'device'};
+  const r=await fetch('/api/cameras',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body)});
+  if(!r.ok){alert(await r.text());return}
+  alert('Added. Restart go2rtc to pick it up: docker compose restart go2rtc'); load();
+}
+async function delCam(id){ if(!confirm('Delete camera?'))return;
+  await fetch('/api/cameras/'+id,{method:'DELETE',headers:{Authorization:'Bearer '+token}}); load(); }
+</script></body></html>
