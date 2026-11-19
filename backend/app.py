@@ -11,6 +11,7 @@ import json
 import os
 import secrets
 import sqlite3
+import sys
 import urllib.parse
 from pathlib import Path
 
@@ -22,9 +23,30 @@ from pydantic import BaseModel, Field
 import hikcloud
 from hikcloud import CloudError
 
+
+def _user_data_dir() -> Path:
+    """Per-user app-data dir (desktop build). Camera passwords live here."""
+    if os.name == "nt":
+        base = Path(os.environ.get(
+            "APPDATA", Path.home() / "AppData" / "Roaming"))
+        return base / "NetSecVMS"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "NetSecVMS"
+    base = Path(os.environ.get("XDG_DATA_HOME",
+                               Path.home() / ".local" / "share"))
+    return base / "netsec-vms"
+
+
 BASE = Path(__file__).resolve().parent.parent
-DATA = BASE / "data"
-DATA.mkdir(exist_ok=True)
+if getattr(sys, "frozen", False):
+    # PyInstaller one-file: bundled files live in _MEIPASS (read-only temp
+    # dir). User data (vms.db + go2rtc.yaml, both hold camera passwords)
+    # must NOT live there — it goes to the per-user app-data dir.
+    BASE = Path(getattr(sys, "_MEIPASS", BASE))
+    DATA = Path(os.environ.get("VMS_DATA_DIR", "")) or _user_data_dir()
+else:
+    DATA = Path(os.environ.get("VMS_DATA_DIR", "")) or (BASE / "data")
+DATA.mkdir(parents=True, exist_ok=True)
 DB = DATA / "vms.db"
 GO2RTC_CONFIG = Path(os.environ.get("GO2RTC_CONFIG", str(DATA / "go2rtc.yaml")))
 FRONTEND = BASE / "frontend"
