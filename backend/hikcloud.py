@@ -187,8 +187,14 @@ def start_watch(index: int, validate_code: str | None = None,
         env = _no_proxy_env()
         env["HIK_CONNECT_USER"] = _creds["username"]
         env["HIK_CONNECT_PASSWORD"] = _creds["password"]
-        cmd = [sys.executable, "-m", "hikcloudstream.cli.stream",
-               str(index), "--proxy", "--port", str(port), "--player", "hls"]
+        if getattr(sys, "frozen", False):
+            # PyInstaller bundle: there is no `python -m hikcloudstream`
+            # — re-invoke this exe in proxy mode (see desktop/launcher.py).
+            cmd = [sys.executable, "--vms-hik-proxy", str(index), "--proxy",
+                   "--port", str(port), "--player", "hls"]
+        else:
+            cmd = [sys.executable, "-m", "hikcloudstream.cli.stream",
+                   str(index), "--proxy", "--port", str(port), "--player", "hls"]
         # Fall back to the console script if the module path differs.
         if validate_code:
             cmd += ["--validate-code", validate_code]
