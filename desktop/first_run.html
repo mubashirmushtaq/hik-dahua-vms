@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NetSec VMS — first run</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         background: #0B1116; color: #E8F1F8; display: flex; align-items: center;
+         justify-content: center; min-height: 100vh; }
+  .card { width: 560px; max-width: 92vw; background: #131C26; border: 1px solid #1F2C3A;
+          border-radius: 14px; padding: 32px 36px; }
+  h1 { margin: 0 0 4px; font-size: 26px; color: #00E5FF; }
+  .sub { color: #8FA3B0; margin: 0 0 22px; }
+  .row { display: flex; justify-content: space-between; align-items: center;
+         background: #0B1116; border: 1px solid #1F2C3A; border-radius: 8px;
+         padding: 12px 14px; margin-bottom: 10px; }
+  .row .k { color: #8FA3B0; font-size: 13px; }
+  .row .v { font-family: ui-monospace, Consolas, monospace; font-size: 17px; }
+  .warn { background: #2A1A08; border: 1px solid #6B4E12; color: #FFC857;
+          border-radius: 8px; padding: 12px 14px; font-size: 14px; margin: 16px 0 22px; }
+  .btns { display: flex; gap: 10px; }
+  a.btn, button.btn { flex: 1; text-align: center; text-decoration: none; cursor: pointer;
+          border: 0; border-radius: 10px; padding: 13px; font-size: 16px; font-weight: 600; }
+  a.btn { background: #00E5FF; color: #0B1116; }
+  button.btn { background: #1F2C3A; color: #E8F1F8; }
+  .fine { color: #5C6E7A; font-size: 12px; margin-top: 18px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>NetSec VMS</h1>
+  <p class="sub">Welcome — your VMS is running on this computer. Log in with the
+  installer account below.</p>
+  <div class="row"><span class="k">Username</span><span class="v">{{USERNAME}}</span></div>
+  <div class="row"><span class="k">Password</span><span class="v" id="pw">{{PASSWORD}}</span></div>
+  <div class="warn">Save this password now — it is shown once and is never
+  stored anywhere on disk. You can change it later from inside the VMS.</div>
+  <div class="btns">
+    <button class="btn" onclick="navigator.clipboard.writeText(document.getElementById('pw').textContent); this.textContent='Copied!';">Copy password</button>
+    <a class="btn" href="{{VMS_URL}}">Open VMS &rarr;</a>
+  </div>
+  <p class="fine">Your cameras and passwords live in {{DATA_DIR}} on this
+  computer only. Nothing is uploaded anywhere.</p>
+</div>
+</body>
+</html>
