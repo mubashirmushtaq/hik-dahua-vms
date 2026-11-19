@@ -4,3 +4,8 @@ __pycache__/
 *.pyc
 go2rtc.yaml
 .venv/
+desktop/dist/
+desktop/build/
+desktop/go2rtc
+desktop/go2rtc.exe
+desktop/*.log
