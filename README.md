@@ -71,6 +71,14 @@ docker compose up -d --build
 # go2rtc: http://<server-ip>:1984
 ```
 
+## Desktop app (Windows .exe / Linux)
+
+No server needed — the same VMS as a desktop app, running on your own
+computer with your Hik-Connect cloud login. See
+[`desktop/README.md`](desktop/README.md). Build it with
+`pyinstaller desktop/vms-desktop.spec`, or grab the artifacts from
+the `Desktop build` GitHub Actions run.
+
 Local dev without Docker:
 
 ```bash
