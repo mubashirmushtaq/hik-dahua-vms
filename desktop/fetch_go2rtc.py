@@ -33,7 +33,7 @@ def asset_for() -> tuple[str, str]:
     if machine not in ("x86_64", "amd64"):
         raise SystemExit(f"unsupported CPU: {machine} (only amd64 is built)")
     if system == "Windows":
-        return "go2rtc_windows_amd64.zip", "go2rtc.exe"
+        return "go2rtc_win64.zip", "go2rtc.exe"
     if system == "Linux":
         return "go2rtc_linux_amd64", "go2rtc"
     raise SystemExit(f"unsupported OS: {system} (Windows / Linux only)")
