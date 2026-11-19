@@ -44,7 +44,7 @@ jobs:
             # Invoke-WebRequest it never throws on an error status.
             $code = "000"
             for ($i = 0; $i -lt 60; $i++) {
-              $code = curl.exe -s -o $null -w "%{http_code}" http://127.0.0.1:8000/
+              $code = curl.exe -s -o NUL -w "%{http_code}" http://127.0.0.1:8000/
               if ($code -eq "200") { break }
               if ($proc.HasExited) { break }
               Start-Sleep -Seconds 2
@@ -57,7 +57,7 @@ jobs:
               throw "frontend did not answer (HTTP $code)"
             }
             # Hik-Connect status route exists and requires login (401 = good)
-            $hcode = curl.exe -s -o $null -w "%{http_code}" http://127.0.0.1:8000/api/hikconnect/status
+            $hcode = curl.exe -s -o NUL -w "%{http_code}" http://127.0.0.1:8000/api/hikconnect/status
             Write-Host "hikconnect/status HTTP: $hcode"
             if ($hcode -ne "401") { throw "unexpected hikconnect/status HTTP $hcode" }
           } finally {
