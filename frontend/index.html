@@ -1,50 +1,170 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Custom VMS — Hik + Dahua</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NetSec VMS — Hikvision + Dahua</title>
 <style>
-body{font-family:system-ui;background:#0b1220;color:#e5e7eb;margin:0;padding:16px}
-h1{font-size:20px}.card{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:14px;margin:12px 0}
-input,select,button{padding:9px;margin:4px 0;border-radius:8px;border:1px solid #374151;background:#0f172a;color:#e5e7eb;width:100%;box-sizing:border-box}
-button{background:#2563eb;border:none;cursor:pointer;font-weight:600}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
-.tile{background:#000;border:1px solid #1f2937;border-radius:10px;padding:10px}
-.tile b{font-size:14px}.tile small{color:#9ca3af}
-video{width:100%;background:#000;border-radius:8px;margin-top:8px}
-.hidden{display:none}
+:root{
+  --bg:#05080f; --bg2:#081020; --panel:#0b1424; --panel2:#0e1a30;
+  --line:#16283f; --line2:#1e3a5c;
+  --txt:#dbe7f5; --mut:#7d93ad; --dim:#54698a;
+  --cy:#22d3ee; --cy-dim:#0e7490; --teal:#2dd4bf; --grn:#34d399;
+  --red:#f87171; --red-bg:#3f1518; --amber:#fbbf24;
+  --mono:ui-monospace,'Cascadia Code','JetBrains Mono',Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:0;background:var(--bg);color:var(--txt);
+  font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.5;
+  background-image:radial-gradient(ellipse 80% 40% at 50% -10%,rgba(34,211,238,.08),transparent);}
+a{color:var(--cy)}
+.hidden{display:none!important}
+
+/* header */
+header{position:sticky;top:0;z-index:10;background:rgba(5,8,15,.92);backdrop-filter:blur(6px);
+  border-bottom:1px solid var(--line);padding:12px 16px;display:flex;align-items:center;gap:10px}
+.logo{width:34px;height:34px;flex:0 0 34px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#0e7490,#22d3ee);color:#04121a;font-weight:800;font-size:17px;
+  font-family:var(--mono);box-shadow:0 0 18px rgba(34,211,238,.35)}
+header h1{font-size:17px;margin:0;letter-spacing:.06em;font-weight:700}
+header h1 span{color:var(--cy)}
+header .sub{font-family:var(--mono);font-size:10px;color:var(--mut);letter-spacing:.14em;text-transform:uppercase}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--grn);box-shadow:0 0 8px var(--grn);margin-left:auto;flex:0 0 8px}
+.dot.off{background:var(--dim);box-shadow:none}
+
+main{max-width:920px;margin:0 auto;padding:16px 14px 40px}
+
+/* cards */
+.card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);
+  border-radius:14px;padding:16px;margin:0 0 14px}
+.card h2{margin:0 0 4px;font-size:16px;letter-spacing:.02em;display:flex;align-items:center;gap:8px}
+.card h2 .tag{font-family:var(--mono);font-size:10px;letter-spacing:.12em;padding:3px 7px;border-radius:99px;
+  border:1px solid var(--line2);color:var(--cy);background:rgba(34,211,238,.07);text-transform:uppercase}
+.card p{margin:6px 0;color:var(--mut);font-size:13.5px}
+.card p b{color:var(--txt)}
+.card.cloud{border-color:rgba(34,211,238,.45);box-shadow:0 0 0 1px rgba(34,211,238,.12),0 8px 30px rgba(34,211,238,.06)}
+.card.cloud h2 .tag{border-color:rgba(34,211,238,.5)}
+.rule{height:1px;background:var(--line);margin:12px -16px}
+
+/* forms */
+label{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--mut);margin:12px 0 4px}
+input,select{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--line2);
+  background:#071022;color:var(--txt);font-size:15px;outline:none}
+input:focus,select:focus{border-color:var(--cy);box-shadow:0 0 0 2px rgba(34,211,238,.18)}
+input::placeholder{color:var(--dim)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row input,.row select{flex:1;min-width:120px}
+button{padding:11px 16px;border-radius:9px;border:1px solid transparent;background:linear-gradient(135deg,#0891b2,#22d3ee);
+  color:#04121a;font-weight:700;font-size:14.5px;cursor:pointer;letter-spacing:.02em}
+button:hover{filter:brightness(1.1)}
+button:active{transform:translateY(1px)}
+button.ghost{background:transparent;border-color:var(--line2);color:var(--txt);font-weight:600}
+button.danger{background:var(--red-bg);border-color:#7f1d1d;color:#fca5a5}
+button.sm{padding:7px 12px;font-size:13px;border-radius:8px;width:auto}
+button.block{width:100%;margin-top:12px}
+.note{font-size:12.5px;color:var(--dim);margin:8px 0 0}
+.note code{font-family:var(--mono);color:var(--mut);background:#0a1526;padding:1px 5px;border-radius:5px}
+.status{font-family:var(--mono);font-size:12.5px;color:var(--teal);background:rgba(45,212,191,.07);
+  border:1px solid rgba(45,212,191,.25);border-radius:8px;padding:8px 10px;margin-top:10px}
+.status.idle{color:var(--mut);background:transparent;border-color:var(--line)}
+.status.err{color:var(--red);border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.06)}
+
+/* camera grid + tiles */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.tile{background:#000;border:1px solid var(--line);border-radius:12px;padding:12px;overflow:hidden}
+.tile .top{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.tile b{font-size:14.5px}
+.tile small{color:var(--mut);font-family:var(--mono);font-size:11.5px}
+.tile .live{margin-left:auto;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--grn);
+  border:1px solid rgba(52,211,153,.4);padding:2px 7px;border-radius:99px}
+.tile video{width:100%;background:#000;border-radius:8px;margin-top:10px;display:block}
+.tile img.snap{width:100%;border-radius:8px;margin-top:10px;display:block}
+.tile .ctl{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.tile .ctl input{width:150px;flex:1;padding:8px 10px;font-size:13.5px}
+.chk{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--mut);cursor:pointer}
+.chk input{width:auto;accent-color:var(--cy)}
+.dev{margin:14px 0 4px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--cy);border-bottom:1px solid var(--line);padding-bottom:6px}
+.dev small{color:var(--mut);letter-spacing:0;text-transform:none}
+.empty{color:var(--dim);font-size:13.5px;padding:8px 0}
+footer{text-align:center;color:var(--dim);font-family:var(--mono);font-size:11px;letter-spacing:.1em;
+  padding:18px 0 8px}
+footer b{color:var(--cy)}
+@media (max-width:480px){
+  header h1{font-size:15px}
+  main{padding:12px 10px 32px}
+  .card{padding:14px}
+  .tile .ctl input{width:100%}
+}
 </style></head><body>
-<h1>Custom VMS — Hikvision + Dahua</h1>
-<div class="card" id="loginCard">
-  <h3>VMS login</h3>
-  <input id="u" placeholder="username — installer" value="installer">
-  <input id="p" type="password" placeholder="password">
-  <button onclick="login()">Login</button>
-  <p><small>Installer = admin. Camera passwords are never shown here.</small></p>
-</div>
-<div id="app" class="hidden">
-  <div class="card"><h3>Hik-Connect cloud — official account</h3>
-    <p><small>Log in with your Hik-Connect account (same as the mobile app) and every linked NVR / camera shows up below — no IP, no port forwarding. Your Hik password is kept in memory only, never saved.</small></p>
-    <input id="hiku" placeholder="Hik-Connect email">
-    <input id="hikp" type="password" placeholder="Hik-Connect password">
-    <button onclick="hikLogin()">Login to Hik-Connect</button>
-    <button onclick="hikLogout()" style="width:auto;background:#374151">Logout</button>
-    <p id="hikStatus"><small>Not logged in to Hik-Connect.</small></p>
-    <div id="hikList"></div>
-    <p><small>If a camera is encrypted, its live view needs the device verification code (on the device label) — enter it when you press Watch. First frame takes ~5–15s. Default is SD substream; tick HD for main stream.</small></p>
+<header>
+  <div class="logo">N</div>
+  <div><h1>NETSEC <span>VMS</span></h1><div class="sub">Hikvision · Dahua · Cloud</div></div>
+  <div class="dot off" id="netDot" title="VMS status"></div>
+</header>
+<main>
+
+  <!-- VMS login -->
+  <div class="card" id="loginCard">
+    <h2>VMS LOGIN <span class="tag">installer</span></h2>
+    <p>Sign in to your custom VMS. Installer is the admin account — create view-only users for anyone else.</p>
+    <label>Username</label>
+    <input id="u" placeholder="installer" value="installer" autocomplete="username">
+    <label>Password</label>
+    <input id="p" type="password" placeholder="VMS password" autocomplete="current-password">
+    <button class="block" onclick="login()">LOGIN →</button>
+    <p class="note">Camera passwords are never shown on this page — they stay on the server only.</p>
   </div>
-  <div class="card"><h3>Add camera (LAN / RTSP)</h3>
-    <input id="name" placeholder="Name — e.g. Front Gate">
-    <select id="brand"><option value="hikvision">Hikvision</option><option value="dahua">Dahua</option></select>
-    <input id="host" placeholder="NVR / camera IP or host — e.g. 192.168.1.64">
-    <input id="port" type="number" value="554">
-    <input id="channel" type="number" value="1">
-    <input id="cuser" placeholder="Camera account — usually admin" value="admin">
-    <input id="cpass" type="password" placeholder="Camera account password">
-    <button onclick="addCam()">Add camera</button>
-    <p><small>Hik RTSP: /Streaming/Channels/101 &nbsp;·&nbsp; Dahua RTSP: /cam/realmonitor?channel=1&amp;subtype=0<br>
-    Live video plays via go2rtc on :1984 — restart go2rtc after adding a camera, then open its stream below.</small></p>
+
+  <div id="app" class="hidden">
+
+    <!-- Hik-Connect cloud — TOP -->
+    <div class="card cloud">
+      <h2>HIK-CONNECT CLOUD <span class="tag">official account</span></h2>
+      <p>Log in with your <b>Hik-Connect account</b> (same as the mobile app) and every linked NVR / camera appears below — no IP, no port forwarding. Your Hik password is kept <b>in memory only</b> and is never saved.</p>
+      <label>Hik-Connect email</label>
+      <input id="hiku" placeholder="you@example.com" autocomplete="username">
+      <label>Hik-Connect password</label>
+      <input id="hikp" type="password" placeholder="Hik-Connect password" autocomplete="current-password">
+      <div class="row" style="margin-top:12px">
+        <button onclick="hikLogin()" style="flex:1">LOGIN TO HIK-CONNECT →</button>
+        <button class="ghost" onclick="hikLogout()">Logout</button>
+      </div>
+      <div id="hikStatus" class="status idle">Not logged in to Hik-Connect.</div>
+      <div id="hikList"></div>
+      <div class="rule"></div>
+      <p class="note">Encrypted camera? Enter its <b>verification code</b> (on the device label) before pressing Watch. First frame takes ~5–15s. Default is <b>SD substream</b> — tick <b>HD</b> for the main stream. Snapshots are cloud thumbnails (max 352×288).</p>
+    </div>
+
+    <!-- LAN cameras -->
+    <div class="card">
+      <h2>ADD CAMERA <span class="tag">LAN / RTSP</span></h2>
+      <p>Add a camera or NVR reachable on the local network by its own account.</p>
+      <label>Name</label>
+      <input id="name" placeholder="e.g. Front Gate">
+      <div class="row">
+        <div style="flex:1;min-width:120px"><label>Brand</label>
+          <select id="brand"><option value="hikvision">Hikvision</option><option value="dahua">Dahua</option></select></div>
+        <div style="flex:2;min-width:160px"><label>Host / IP</label>
+          <input id="host" placeholder="e.g. 192.168.1.64"></div>
+      </div>
+      <div class="row">
+        <div style="flex:1"><label>Port</label><input id="port" type="number" value="554"></div>
+        <div style="flex:1"><label>Channel</label><input id="channel" type="number" value="1"></div>
+      </div>
+      <label>Camera account</label>
+      <input id="cuser" placeholder="usually admin" value="admin">
+      <label>Camera password</label>
+      <input id="cpass" type="password" placeholder="Camera account password">
+      <button class="block" onclick="addCam()">+ ADD CAMERA</button>
+      <p class="note">Hik RTSP: <code>/Streaming/Channels/101</code> · Dahua RTSP: <code>/cam/realmonitor?channel=1&amp;subtype=0</code><br>
+      Live video plays via go2rtc on <code>:1984</code> — restart go2rtc after adding a camera, then open its stream below.</p>
+    </div>
+
+    <h2 style="font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);margin:18px 2px 10px">▸ LAN CAMERAS</h2>
+    <div class="grid" id="grid"></div>
   </div>
-  <div class="grid" id="grid"></div>
-</div>
+
+  <footer>NETSEC <b>VMS</b> · HIKVISION + DAHUA · BUILT BY <b>MUBASHIR</b></footer>
+</main>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7"></script>
 <script>
 let token='';
@@ -53,15 +173,17 @@ async function login(){
     body:JSON.stringify({username:u.value,password:p.value})});
   if(!r.ok){alert('Wrong username or password');return}
   const d=await r.json(); token=d.token;
-  loginCard.classList.add('hidden'); app.classList.remove('hidden'); load(); hikStatusInit();
+  loginCard.classList.add('hidden'); app.classList.remove('hidden');
+  document.getElementById('netDot').classList.remove('off');
+  load(); hikStatusInit();
 }
 async function load(){
   const r=await fetch('/api/cameras',{headers:{Authorization:'Bearer '+token}});
   const cams=await r.json();
-  grid.innerHTML=cams.map(c=>`<div class="tile"><b>${c.name}</b> <small>${c.brand} · ${c.host}:${c.port} · ch${c.channel}</small>
-    <br><small>go2rtc stream: <b>cam${c.id}</b> — open http://&lt;server&gt;:1984, or embed WebRTC here in Phase 1b</small>
-    <br><button onclick="delCam(${c.id})" style="width:auto;background:#991b1b">Delete</button></div>`).join('')
-    || '<p>No cameras yet — add your first one above.</p>';
+  grid.innerHTML=cams.map(c=>`<div class="tile"><div class="top"><b>${c.name}</b> <small>${c.brand} · ${c.host}:${c.port} · ch${c.channel}</small></div>
+    <div class="ctl"><small style="color:var(--mut)">go2rtc stream <b style="color:var(--cy)">cam${c.id}</b> — open http://&lt;server&gt;:1984, or embed WebRTC here in Phase 1b</small></div>
+    <div class="ctl"><button class="sm danger" onclick="delCam(${c.id})">Delete</button></div></div>`).join('')
+    || '<p class="empty">No LAN cameras yet — add your first one above.</p>';
 }
 async function addCam(){
   const body={name:name.value,brand:brand.value,host:host.value,port:+port.value,channel:+channel.value,username:cuser.value,password:cpass.value,conn:'device'};
@@ -72,32 +194,35 @@ async function addCam(){
 async function delCam(id){ if(!confirm('Delete camera?'))return;
   await fetch('/api/cameras/'+id,{method:'DELETE',headers:{Authorization:'Bearer '+token}}); load(); }
 async function hikLogin(){
+  hikStatus.className='status idle'; hikStatus.textContent='Logging in to Hik-Connect…';
   const r=await fetch('/api/hikconnect/login',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
     body:JSON.stringify({username:hiku.value,password:hikp.value})});
   const d=await r.json();
-  if(!r.ok){alert(d.detail||'Hik-Connect login failed');return}
-  hikStatus.innerHTML=`<small>Logged in as <b>${d.account}</b> — ${d.cameras} cameras/channels linked.</small>`;
+  if(!r.ok){hikStatus.className='status err'; hikStatus.textContent='✕ '+(d.detail||'Hik-Connect login failed');return}
+  hikStatus.className='status'; hikStatus.textContent='● Logged in as '+d.account+' — '+d.cameras+' cameras/channels linked.';
   hikListCams();
 }
 async function hikLogout(){
   await fetch('/api/hikconnect/logout',{method:'POST',headers:{Authorization:'Bearer '+token}});
-  hikStatus.innerHTML='<small>Not logged in to Hik-Connect.</small>'; hikList.innerHTML='';
+  hikStatus.className='status idle'; hikStatus.textContent='Not logged in to Hik-Connect.'; hikList.innerHTML='';
 }
 async function hikListCams(){
   const r=await fetch('/api/hikconnect/cameras',{headers:{Authorization:'Bearer '+token}});
   const cams=await r.json();
-  if(!Array.isArray(cams)){hikList.innerHTML='<p>'+(cams.detail||'Could not list devices')+'</p>';return}
+  if(!Array.isArray(cams)){hikList.innerHTML='<p class="empty">'+(cams.detail||'Could not list devices')+'</p>';return}
   const byDevice={}; cams.forEach(c=>{(byDevice[c.device]=byDevice[c.device]||[]).push(c)});
-  hikList.innerHTML=Object.entries(byDevice).map(([dev,list])=>`<div style="margin:10px 0"><b>${dev}</b> <small>(${list.length} channels)</small>`+
-    list.map(c=>`<div class="tile" style="margin-top:6px"><b>${c.name}</b> <small>ch${c.channelNo} · ${c.deviceSerial}</small>
-    <br><img id="snap${c.index}" style="width:100%;max-width:320px;display:none">
-    <br><input id="vc${c.index}" placeholder="Verification code (only if encrypted)" style="width:60%">
-    <label style="font-size:13px"><input id="hd${c.index}" type="checkbox" style="width:auto"> HD</label>
-    <button onclick="hikSnap(${c.index})" style="width:auto">Snapshot</button>
-    <button onclick="hikWatch(${c.index})" style="width:auto">Watch live</button>
-    <button onclick="hikStop(${c.index})" style="width:auto;background:#991b1b">Stop</button>
-    <div id="watch${c.index}"></div></div>`).join('')+'</div>').join('')
-    || '<p>No cameras on this Hik-Connect account.</p>';
+  hikList.innerHTML=Object.entries(byDevice).map(([dev,list])=>`<div class="dev">${dev} <small>· ${list.length} channel${list.length>1?'s':''}</small></div>`+
+    list.map(c=>`<div class="tile" style="margin-top:8px"><div class="top"><b>${c.name}</b> <small>ch${c.channelNo} · ${c.deviceSerial}</small></div>
+    <img id="snap${c.index}" class="snap" style="display:none">
+    <div class="ctl"><input id="vc${c.index}" placeholder="Verification code (only if encrypted)">
+    <label class="chk"><input id="hd${c.index}" type="checkbox"> HD</label></div>
+    <div class="ctl">
+      <button class="sm" onclick="hikSnap(${c.index})">Snapshot</button>
+      <button class="sm" onclick="hikWatch(${c.index})">▶ Watch live</button>
+      <button class="sm danger" onclick="hikStop(${c.index})">■ Stop</button>
+    </div>
+    <div id="watch${c.index}"></div></div>`).join('')).join('')
+    || '<p class="empty">No cameras on this Hik-Connect account.</p>';
 }
 async function hikSnap(i){
   const r=await fetch(`/api/hikconnect/cameras/${i}/snapshot?validate_code=${encodeURIComponent(document.getElementById('vc'+i).value||'')}`,{headers:{Authorization:'Bearer '+token}});
@@ -108,17 +233,17 @@ async function hikWatch(i){
   const vc=document.getElementById('vc'+i).value||null;
   const main=document.getElementById('hd'+i).checked;
   const box=document.getElementById('watch'+i);
-  box.innerHTML='<small>Starting cloud stream… first frame takes ~5–15s.</small>';
+  box.innerHTML='<p class="note">Starting cloud stream… first frame takes ~5–15s.</p>';
   const r=await fetch(`/api/hikconnect/cameras/${i}/watch`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
     body:JSON.stringify({validate_code:vc,main})});
   const d=await r.json();
-  if(!r.ok){box.innerHTML='<small>'+(d.detail||'Could not start stream')+'</small>';return}
+  if(!r.ok){box.innerHTML='<p class="note" style="color:var(--red)">'+(d.detail||'Could not start stream')+'</p>';return}
   box.innerHTML=`<video id="vid${i}" controls autoplay muted playsinline></video>
-    <br><small>HLS: <a href="${d.hls}" target="_blank">${d.hls}</a> · <a href="${d.viewer}" target="_blank">viewer</a> (port ${d.port})</small>`;
+    <p class="note">HLS: <a href="${d.hls}" target="_blank">${d.hls}</a> · <a href="${d.viewer}" target="_blank">viewer</a> (port ${d.port})</p>`;
   const v=document.getElementById('vid'+i);
   if(window.Hls && Hls.isSupported()){const h=new Hls(); h.loadSource(d.hls); h.attachMedia(v); h.on(Hls.Events.MANIFEST_PARSED,()=>v.play().catch(()=>{}));}
   else if(v.canPlayType('application/vnd.apple.mpegurl')){v.src=d.hls; v.play().catch(()=>{});}
-  else {box.innerHTML+='<br><small>Your browser cannot play HLS — open the viewer link instead.</small>';}
+  else {box.innerHTML+='<p class="note">Your browser cannot play HLS — open the viewer link instead.</p>';}
 }
 async function hikStop(i){
   await fetch(`/api/hikconnect/cameras/${i}/watch`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
@@ -127,6 +252,6 @@ async function hikStop(i){
 async function hikStatusInit(){
   const r=await fetch('/api/hikconnect/status',{headers:{Authorization:'Bearer '+token}});
   const d=await r.json();
-  if(d.logged_in){hikStatus.innerHTML=`<small>Logged in as <b>${d.account}</b> — ${d.cameras} cameras/channels linked.</small>`; hikListCams();}
+  if(d.logged_in){hikStatus.className='status'; hikStatus.textContent='● Logged in as '+d.account+' — '+d.cameras+' cameras/channels linked.'; hikListCams();}
 }
 </script></body></html>
