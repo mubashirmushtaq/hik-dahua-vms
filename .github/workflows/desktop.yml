@@ -3,6 +3,13 @@
 # PyInstaller is platform-specific, so the Windows .exe MUST be built
 # on a Windows runner (no Wine cross-builds). Trigger manually from
 # the Actions tab, or by pushing a tag like desktop-v1.0.
+#
+# NOTE: the Windows .exe is built windowed (console=False in the spec),
+# so it has NO stdout/stderr — a crash leaves nothing in the job log.
+# The launcher writes everything to %APPDATA%\NetSecVMS\netsec-vms.log
+# instead; the smoke test below dumps that file when the check fails.
+# That is why the test polls and prints the log instead of relying on
+# captured process output.
 name: Desktop build
 
 on:
@@ -25,13 +32,40 @@ jobs:
       - name: Build .exe
         run: pyinstaller desktop/vms-desktop.spec
       - name: Smoke test (headless)
+        shell: pwsh
         run: |
-          Start-Process -FilePath "dist\NetSecVMS.exe" -ArgumentList "--headless" -PassThru | Out-Null
-          Start-Sleep -Seconds 25
-          $code = (Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -UseBasicParsing).StatusCode
-          if ($code -ne 200) { throw "frontend did not answer (HTTP $code)" }
-          Stop-Process -Name "NetSecVMS" -Force -ErrorAction SilentlyContinue
-      - uses: actions/upload-artifact@v4
+          $logFile = "$env:APPDATA\NetSecVMS\netsec-vms.log"
+          if (Test-Path $logFile) { Remove-Item $logFile -Force }
+          $proc = Start-Process -FilePath "dist\NetSecVMS.exe" -ArgumentList "--headless" -PassThru
+          try {
+            # One-file exe unpacks on first launch; poll up to ~120s.
+            # curl.exe returns "000" while nothing listens, and the real
+            # HTTP code (even 4xx) once the backend answers — unlike
+            # Invoke-WebRequest it never throws on an error status.
+            $code = "000"
+            for ($i = 0; $i -lt 60; $i++) {
+              $code = curl.exe -s -o $null -w "%{http_code}" http://127.0.0.1:8000/
+              if ($code -eq "200") { break }
+              if ($proc.HasExited) { break }
+              Start-Sleep -Seconds 2
+            }
+            $exitInfo = if ($proc.HasExited) { "exited, code $($proc.ExitCode)" } else { "still running" }
+            Write-Host "frontend HTTP: $code (app $exitInfo)"
+            if ($code -ne "200") {
+              Write-Host "--- launcher log ($logFile) ---"
+              if (Test-Path $logFile) { Get-Content $logFile } else { Write-Host "(no log file — app died before logging)" }
+              throw "frontend did not answer (HTTP $code)"
+            }
+            # Hik-Connect status route exists and requires login (401 = good)
+            $hcode = curl.exe -s -o $null -w "%{http_code}" http://127.0.0.1:8000/api/hikconnect/status
+            Write-Host "hikconnect/status HTTP: $hcode"
+            if ($hcode -ne "401") { throw "unexpected hikconnect/status HTTP $hcode" }
+          } finally {
+            if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+          }
+      - name: Upload Windows artifact
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: NetSecVMS-Windows
           path: dist/NetSecVMS.exe
@@ -57,7 +91,8 @@ jobs:
         run: |
           ./dist/NetSecVMS --headless > /tmp/vms-smoke.log 2>&1 &
           echo $! > /tmp/vms-smoke.pid
-          for i in $(seq 1 30); do
+          trap 'kill "$(cat /tmp/vms-smoke.pid)" 2>/dev/null || true' EXIT
+          for i in $(seq 1 120); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/ || true)
             [ "$code" = "200" ] && break
             sleep 1
@@ -68,8 +103,9 @@ jobs:
           hcode=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/hikconnect/status)
           echo "hikconnect/status HTTP: $hcode"
           [ "$hcode" = "401" ] || { cat /tmp/vms-smoke.log; exit 1; }
-          kill "$(cat /tmp/vms-smoke.pid)" || true
-      - uses: actions/upload-artifact@v4
+      - name: Upload Linux artifact
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: NetSecVMS-Linux
           path: dist/NetSecVMS
