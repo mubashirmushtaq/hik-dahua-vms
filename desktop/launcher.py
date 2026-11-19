@@ -25,7 +25,6 @@ import logging
 import os
 import secrets
 import shutil
-import signal
 import socket
 import subprocess
 import sys
@@ -133,6 +132,10 @@ class Go2Rtc:
         self._terminate()
         self._spawn()
 
+    def alive(self) -> bool:
+        """True while the child process is still running."""
+        return self.proc is not None and self.proc.poll() is None
+
     def _terminate(self) -> None:
         if self.proc is None:
             return
@@ -203,11 +206,19 @@ def main(argv: list[str] | None = None) -> int:
     data_dir = user_data_dir()
     data_dir.mkdir(parents=True, exist_ok=True)
     log_path = data_dir / "netsec-vms.log"
+    # The log FILE is the diagnostic channel that always works. The
+    # console handler is added only when stdout exists: a windowed
+    # PyInstaller .exe on Windows has sys.stdout == None (see
+    # https://pyinstaller.org/en/stable/usage.html, "-w / --windowed"),
+    # so StreamHandler(sys.stdout) would be a dead handler there.
+    handlers: list[logging.Handler] = [
+        logging.FileHandler(log_path, encoding="utf-8")]
+    if sys.stdout is not None:
+        handlers.append(logging.StreamHandler(sys.stdout))
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
-        handlers=[logging.FileHandler(log_path, encoding="utf-8"),
-                  logging.StreamHandler(sys.stdout)])
+        handlers=handlers)
     log.info("%s starting, data dir: %s", APP_NAME, data_dir)
 
     if not port_free(BACKEND_PORT):
@@ -276,16 +287,32 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     log.info("backend up: %s", vms_url)
     if go2rtc is not None:
-        log.info("go2rtc up: http://%s:%d/", BACKEND_HOST, GO2RTC_PORT)
+        if go2rtc.alive():
+            log.info("go2rtc up: http://%s:%d/", BACKEND_HOST, GO2RTC_PORT)
+        else:
+            # The child was spawned but died at once (wrong binary /
+            # missing DLL). The backend still works; LAN cameras won't.
+            log.error("go2rtc exited immediately (exit code %s) — "
+                      "LAN cameras will not play; see the go2rtc binary",
+                      go2rtc.proc.poll() if go2rtc.proc else "?")
 
     if headless:
-        print(f"VMS running: {vms_url}", flush=True)
+        # NOTE: no print() here. In a windowed PyInstaller .exe on
+        # Windows, sys.stdout is None and print() raises AttributeError,
+        # which killed the app right after the backend came up (CI saw
+        # "connection refused"). log.info() goes to the log file and,
+        # when a console exists, to stdout.
+        log.info("VMS running: %s", vms_url)
         if first_run:
-            print(f"FIRST RUN — installer login: {admin_user} / {admin_pass}",
-                  flush=True)
-        print("Press Ctrl+C to stop.", flush=True)
+            log.info("FIRST RUN — installer login: %s / %s",
+                     admin_user, admin_pass)
+        log.info("Press Ctrl+C to stop.")
         try:
-            signal.pause()
+            # signal.pause() is Unix-only — on Windows it raises
+            # AttributeError and would kill the app the same way.
+            # A sleep loop works on every platform.
+            while True:
+                time.sleep(1)
         except KeyboardInterrupt:
             pass
         shutdown()
