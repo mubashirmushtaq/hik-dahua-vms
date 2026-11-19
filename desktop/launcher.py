@@ -258,6 +258,16 @@ def main(argv: list[str] | None = None) -> int:
     import uvicorn
     import backend.app as vms_app
 
+    # Windowed PyInstaller .exe on Windows has NO console, so
+    # sys.stdout/sys.stderr are None. uvicorn's DefaultFormatter calls
+    # sys.stdout.isatty() while setting up its logging and dies with
+    # AttributeError (CI run #4 proved it). Give it a harmless sink
+    # before uvicorn starts; log output still goes to the log file.
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w")
+
     def run_server() -> None:
         # uvicorn.run in a worker thread: ANY exception here dies
         # silently — on a windowed Windows .exe there is no stderr to
