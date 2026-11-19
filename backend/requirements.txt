@@ -3,3 +3,7 @@ uvicorn[standard]>=0.34.0
 pydantic>=2.10.4
 # Hik-Connect cloud login (Phase 3) — unofficial SDK, needs ffmpeg on PATH
 hikcloudstream[cli]>=0.1.4
+# hikcloudstream 0.1.4 imports pyezvizapi.stream / cloud_stream —
+# those modules were removed in pyezvizapi 2.x (renamed to `streaming`).
+# Pin the last 1.x or the cloud live-video proxy fails to import.
+pyezvizapi==1.0.5.0
