@@ -1,0 +1,8 @@
+# Desktop build: the VMS backend + PyInstaller + pywebview.
+# The backend's own deps (FastAPI, hikcloudstream, ...) come from
+# ../backend/requirements.txt — that file pins pyezvizapi==1.0.5.0,
+# which hikcloudstream 0.1.4 needs (its pyezvizapi.stream import was
+# removed in pyezvizapi 2.x).
+-r ../backend/requirements.txt
+pyinstaller>=6.0
+pywebview>=5.0
