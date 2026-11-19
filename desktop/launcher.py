@@ -30,6 +30,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 import urllib.request
 from pathlib import Path
 
@@ -257,11 +258,28 @@ def main(argv: list[str] | None = None) -> int:
     import uvicorn
     import backend.app as vms_app
 
+    def run_server() -> None:
+        # uvicorn.run in a worker thread: ANY exception here dies
+        # silently — on a windowed Windows .exe there is no stderr to
+        # print a traceback to, so the launcher would just time out
+        # waiting for the backend (exactly what CI run #3 showed).
+        # Log the full traceback to the log file instead.
+        try:
+            uvicorn.run(vms_app.app, host=BACKEND_HOST, port=BACKEND_PORT,
+                        log_level="warning", loop="asyncio")
+        except Exception:
+            log.exception("backend thread crashed")
+
+    def _thread_excepthook(args: threading.ExceptHookArgs) -> None:
+        log.error("thread %s crashed: %s", args.thread,
+                  "".join(traceback.format_exception(args.exc_type,
+                                                     args.exc_value,
+                                                     args.exc_traceback)))
+
+    threading.excepthook = _thread_excepthook
+
     server_thread = threading.Thread(
-        target=uvicorn.run,
-        kwargs={"app": vms_app.app, "host": BACKEND_HOST,
-                "port": BACKEND_PORT, "log_level": "warning"},
-        daemon=True, name="vms-backend")
+        target=run_server, daemon=True, name="vms-backend")
     server_thread.start()
 
     go2rtc_bin = find_go2rtc()
